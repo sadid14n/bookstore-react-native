@@ -35,4 +35,30 @@ router.post("/", protectRoute, async (req, res) => {
   }
 });
 
+router.get("/", protectRoute, async (req, res) => {
+  try {
+    const page = req.query.page || 1;
+    const limit = req.query.limit || 5;
+    const skip = (page - 1) * limit;
+
+    const books = await Book.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("user", "username profileImg");
+
+    const totalBooks = await Book.countDocuments();
+
+    res.status(200).send({
+      books,
+      currentPage: page,
+      totalPages: Math.ceil(totalBooks / limit),
+      totalBooks,
+    });
+  } catch (error) {
+    console.log("Error fetching books: ", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
 export default router;
