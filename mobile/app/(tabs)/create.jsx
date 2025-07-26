@@ -55,7 +55,7 @@ export default function Create() {
         mediaTypes: "images",
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.5, // lower the image quality for smaller base64 string
+        quality: 0.2, // lower the image quality for smaller base64 string
         base64: true,
       });
 
@@ -107,6 +107,7 @@ export default function Create() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           title,
           caption,
@@ -115,7 +116,14 @@ export default function Create() {
         }),
       });
 
-      const data = await response.json();
+      // const text = await response.text();
+
+      // if (!response.ok) {
+      //   console.log("Error response text:", text);
+      //   throw new Error(data.message || "Request failed");
+      // }
+
+      const data = response.json();
       if (!response.ok) throw new Error(data.message || "Something went wrong");
 
       Alert.alert("Success", "Your book recommendation has been posted!");
