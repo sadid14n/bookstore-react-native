@@ -9,29 +9,34 @@ router.post("/", protectRoute, async (req, res) => {
   try {
     const { title, caption, rating, image } = req.body;
 
+    console.log(req.body);
+
     if (!title || !caption || !rating || !image) {
       return res.status(400).json({ message: "All fields are required" });
     }
-
-    // upload the image to cloudinary
-    const uploadResponse = await cloudinary.uploader.upload(image);
-    const imageUrl = uploadResponse.secure_url;
 
     // save the book data to mongodb
     const newBook = await Book.create({
       title,
       caption,
       rating,
-      image: imageUrl,
+      image,
       user: req.user._id,
     });
 
     await newBook.save();
 
-    res.status(201).json(newBook);
+    res.status(201).json({
+      success: true,
+      message: "Book created successfully",
+      newBook,
+    });
   } catch (error) {
     console.log("Error creating book: ", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
   }
 });
 
