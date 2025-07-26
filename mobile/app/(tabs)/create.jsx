@@ -17,9 +17,10 @@ import { Ionicons } from "@expo/vector-icons";
 import COLORS from "../../constants/color";
 
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+// import * as FileSystem from "expo-file-system";
 import { useAuthStore } from "./../../store/authStore";
 import { API_URL } from "../../constants/api";
+import axios from "axios";
 
 export default function Create() {
   const [title, setTitle] = useState("");
@@ -27,7 +28,7 @@ export default function Create() {
   const [rating, setRating] = useState(3);
   // to display the selected image
   const [image, setImage] = useState(null);
-  const [imageBase64, setImageBase64] = useState(null);
+  const [imageURL, setImageURL] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const { token } = useAuthStore();
@@ -55,27 +56,47 @@ export default function Create() {
         mediaTypes: "images",
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.2, // lower the image quality for smaller base64 string
-        base64: true,
       });
 
-      if (!result.canceled) {
-        // console.log("result is here", result);
-        setImage(result.assets[0].uri);
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
       }
+      setImage(result.assets[0].uri);
 
-      // if base 64 provided use it
-      if (result.assets[0].base64) {
-        setImageBase64(result.assets[0].base64);
+      const asset = result.assets[0];
+      const fileName = asset.fileName || "image.jpg";
+      const imageType = asset.mimeType || "image/jpeg";
+
+      const formData = new FormData();
+      formData.append("file", {
+        uri: asset.uri,
+        type: imageType,
+        name: fileName,
+      });
+
+      formData.append("upload_preset", "bookstore_react_native");
+      formData.append("folder", "bookstore_react_native");
+
+      setLoading(true);
+      const cloudinaryRes = await axios.post(
+        "https://api.cloudinary.com/v1_1/dplsiqv75/image/upload",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      setLoading(false);
+
+      const secureUrl = cloudinaryRes.data.secure_url;
+
+      if (secureUrl) {
+        setImageURL(secureUrl); // Store the Cloudinary image URL
       } else {
-        // otherwise, convert to base 64
-        const base64 = await FileSystem.readAsStringAsync(
-          result.assets[0].uri,
-          {
-            encoding: FileSystem.EncodingType.Base64,
-          }
-        );
-        setImageBase64(base64);
+        console.error("Cloudinary upload failed", cloudinaryRes.data);
+        Alert.alert("Upload Failed", "Could not upload image. Try again.");
+        setImage(null);
       }
     } catch (error) {
       console.error("Error picking image", error);
@@ -84,7 +105,7 @@ export default function Create() {
   };
 
   const handleSubmit = async () => {
-    if (!title || !caption || !imageBase64 || !rating) {
+    if (!title || !caption || !imageURL || !rating) {
       Alert.alert("Error", "Please fill in all fields");
       return;
     }
@@ -92,46 +113,33 @@ export default function Create() {
     try {
       setLoading(true);
 
-      // get file extension from URI or default to jpeg
-      const uriParts = image.split(".");
-      const fileType = uriParts[uriParts.length - 1];
-      const imageType = fileType
-        ? `image/${fileType.toLowerCase()}`
-        : "image/jpeg";
-
-      const imageDataUrl = `data:${imageType};base64,${imageBase64}`;
-
-      const response = await fetch(`${API_URL}/api/books`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
+      const response = await axios.post(
+        `${API_URL}/api/books`,
+        {
           title,
           caption,
           rating: rating.toString(),
-          image: imageDataUrl,
-        }),
-      });
+          image: imageURL,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-      // const text = await response.text();
-
-      // if (!response.ok) {
-      //   console.log("Error response text:", text);
-      //   throw new Error(data.message || "Request failed");
-      // }
-
-      const data = response.json();
-      if (!response.ok) throw new Error(data.message || "Something went wrong");
+      if (!response.data.success) {
+        Alert.alert("Error", response.data.message);
+        return;
+      }
 
       Alert.alert("Success", "Your book recommendation has been posted!");
       setTitle("");
       setCaption("");
       setRating(3);
       setImage(null);
-      setImageBase64(null);
+      setImageURL(null);
 
       router.push("/");
     } catch (error) {
