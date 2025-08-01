@@ -1,4 +1,10 @@
-import { View, Text, FlatList } from "react-native";
+import {
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 import React, { useEffect, useState } from "react";
 import { useAuthStore } from "../../store/authStore";
 import { Image } from "expo-image";
@@ -7,6 +13,9 @@ import { API_URL } from "../../constants/api";
 import { Ionicons } from "@expo/vector-icons";
 import COLORS from "../../constants/color";
 import { formatePublishDate } from "../../lib/utils";
+import Loader from "../../components/Loader";
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function Home() {
   const { token } = useAuthStore();
@@ -23,7 +32,7 @@ export default function Home() {
       else if (pageNum === 1) setLoading(true);
 
       const response = await fetch(
-        `${API_URL}/api/books?page=${pageNum}&limit=5`,
+        `${API_URL}/api/books?page=${pageNum}&limit=2`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -52,8 +61,10 @@ export default function Home() {
     } catch (error) {
       console.log("Error fetching boks", error);
     } finally {
-      if (refresh) setRefreshing(false);
-      else setLoading(false);
+      if (refresh) {
+        await sleep(800);
+        setRefreshing(false);
+      } else setLoading(false);
     }
   };
 
@@ -61,7 +72,12 @@ export default function Home() {
     fetchBooks();
   }, []);
 
-  const handleLoadMore = async () => {};
+  const handleLoadMore = async () => {
+    if (hasMore && !loading && !refreshing) {
+      await sleep(1000);
+      await fetchBooks(page + 1);
+    }
+  };
 
   const renderItem = ({ item }) => (
     <View style={styles.bookCard}>
@@ -117,6 +133,8 @@ export default function Home() {
     return stars;
   };
 
+  if (loading) return <Loader size="small" />;
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -125,6 +143,16 @@ export default function Home() {
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchBooks(1, true)}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.1}
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={styles.headerTitle}>BookWorm 🦅</Text>
@@ -132,6 +160,15 @@ export default function Home() {
               Discover great reads from the community 👇
             </Text>
           </View>
+        }
+        ListFooterComponent={
+          hasMore && books.length > 0 ? (
+            <ActivityIndicator
+              style={styles.footerLoader}
+              size="small"
+              color={COLORS.primary}
+            />
+          ) : null
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
