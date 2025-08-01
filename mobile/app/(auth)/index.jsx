@@ -17,7 +17,7 @@ import { Link } from "expo-router";
 import { useAuthStore } from "../../store/authStore";
 
 const Login = () => {
-  const { isLoading, login } = useAuthStore();
+  const { isLoading, login, isCheckingAuth } = useAuthStore();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,6 +27,8 @@ const Login = () => {
     const result = await login(email, password);
     if (!result.success) Alert.alert("Error", result.error);
   };
+
+  if (isCheckingAuth) return null;
 
   return (
     <KeyboardAvoidingView
@@ -117,7 +119,7 @@ const Login = () => {
 
             {/* Footer */}
             <View style={styles.footer}>
-              <Text style={styles.footerText}>Don't have an account? </Text>
+              <Text style={styles.footerText}>Don't have an account?</Text>
               <Link href={"/signup"} asChild>
                 <TouchableOpacity>
                   <Text style={styles.link}>Sign Up</Text>
